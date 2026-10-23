@@ -525,8 +525,8 @@
     <!-- 强名称签名默认关闭：VSTO 加载项不要求，且无交互环境无法导入密钥容器；需要时用 /p:GwStrongName=true 开启 -->
     <SignAssembly>false</SignAssembly>
     <SignAssembly Condition="'$(GwStrongName)' == 'true'">true</SignAssembly>
-    <AssemblyOriginatorKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</AssemblyOriginatorKeyFile>
-    <ManifestKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</ManifestKeyFile>
+    <AssemblyOriginatorKeyFile Condition="'$(GwStrongName)' == 'true'">xkonglong.com.pfx</AssemblyOriginatorKeyFile>
+    <!-- ClickOnce 清单签名只按指纹从证书存储取证书，不用 pfx 文件，避免无交互环境导入密钥容器失败 -->
     <ManifestCertificateThumbprint Condition="Exists('$(_GwSignKey)')">6F5E89EB98A164A7A28E8A08C9D005727987B689</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
