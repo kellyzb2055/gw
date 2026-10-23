@@ -525,24 +525,16 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
   </PropertyGroup>
+  <!-- 仅在本地存在签名证书时启用签名；CI 无证书时自动跳过 -->
   <PropertyGroup>
-    <SignManifests>true</SignManifests>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ManifestKeyFile>xkonglong.com.pfx</ManifestKeyFile>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ManifestCertificateThumbprint>3E0F68E17300583E21B4917F6B132C55668740B8</ManifestCertificateThumbprint>
-  </PropertyGroup>
-  <PropertyGroup>
-    <ManifestTimestampUrl>
-    </ManifestTimestampUrl>
-  </PropertyGroup>
-  <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
-    <AssemblyOriginatorKeyFile>xkonglong.com.pfx</AssemblyOriginatorKeyFile>
+    <_GwSignKey>$(MSBuildProjectDirectory)\xkonglong.com.pfx</_GwSignKey>
+    <SignManifests Condition="!Exists('$(_GwSignKey)')">false</SignManifests>
+    <SignManifests Condition="Exists('$(_GwSignKey)')">true</SignManifests>
+    <SignAssembly Condition="!Exists('$(_GwSignKey)')">false</SignAssembly>
+    <SignAssembly Condition="Exists('$(_GwSignKey)')">true</SignAssembly>
+    <AssemblyOriginatorKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</AssemblyOriginatorKeyFile>
+    <ManifestKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</ManifestKeyFile>
+    <ManifestCertificateThumbprint Condition="Exists('$(_GwSignKey)')">3E0F68E17300583E21B4917F6B132C55668740B8</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <DelaySign>false</DelaySign>

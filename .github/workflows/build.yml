@@ -1,0 +1,64 @@
+name: build-verify
+
+on:
+  push:
+    branches: [ci/verify-build]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 探测 VSTO 工具链
+        shell: pwsh
+        run: |
+          Write-Host "=== VS 版本目录 ==="
+          Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022' -Directory -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Name }
+
+          Write-Host "=== OfficeTools targets ==="
+          $targets = Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022\*\MSBuild\Microsoft\VisualStudio\v17.0\OfficeTools\Microsoft.VisualStudio.Tools.Office.targets' -ErrorAction SilentlyContinue
+          if ($targets) { $targets | ForEach-Object { "找到: $($_.FullName)" } }
+          else { Write-Host "未找到 OfficeTools targets" }
+
+          Write-Host "=== VSTO PIA 目录 ==="
+          $pia = 'C:\Program Files (x86)\Microsoft Visual Studio\Shared\Visual Studio Tools for Office\PIA'
+          if (Test-Path $pia) { Get-ChildItem $pia -ErrorAction SilentlyContinue | ForEach-Object { "找到: $($_.Name)" } }
+          else { Write-Host "未找到 VSTO PIA 目录" }
+
+          Write-Host "=== Office.Tools 程序集 ==="
+          @(
+            'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.Office.Tools',
+            'C:\Windows\assembly\GAC_MSIL\Microsoft.Office.Tools'
+          ) | ForEach-Object { if (Test-Path $_) { "存在: $_" } }
+
+          Write-Host "=== Office Interop 程序集 ==="
+          @(
+            'C:\Windows\assembly\GAC_MSIL\Microsoft.Office.Interop.Word',
+            'C:\Windows\Microsoft.NET\assembly\GAC_MSIL\Microsoft.Office.Interop.Word'
+          ) | ForEach-Object { if (Test-Path $_) { "存在: $_" } }
+
+      - name: 安装 NuGet
+        uses: nuget/setup-nuget@v1
+
+      - name: 还原 NuGet 包
+        run: nuget restore src\公文排版.csproj -PackagesDirectory packages -NonInteractive
+
+      - name: 配置 MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: 编译 Release
+        run: msbuild src\公文排版.csproj /p:Configuration=Release /p:Platform=AnyCPU /v:normal /nologo
+
+      - name: 列出产物
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "=== bin\Release ==="
+          Get-ChildItem 'src\bin\Release' -Recurse -File -ErrorAction SilentlyContinue |
+            Select-Object FullName, Length | Format-Table -AutoSize
