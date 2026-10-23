@@ -62,6 +62,35 @@ jobs:
       - name: 编译 Release
         run: msbuild src\公文排版.csproj /p:Configuration=Release /p:Platform=AnyCPU /p:SignManifests=true /p:ManifestCertificateThumbprint=${{ env.CERT_THUMB }} /v:normal /nologo
 
+      - name: 校验 VBA 脚本过程名可识别
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'VBA Script'
+          if (-not (Test-Path $dir)) { Write-Host '未找到 VBA 脚本目录，跳过'; exit 0 }
+
+          $pattern = '^[ \t]*(?:Public[ \t]+|Private[ \t]+|Friend[ \t]+)?(?:Static[ \t]+)?(?:Sub|Function)[ \t]+([^\s(]+)'
+          $options = [System.Text.RegularExpressions.RegexOptions]::Multiline -bor [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+          $enc = [System.Text.Encoding]::GetEncoding(936)
+
+          $failed = @()
+          $files = Get-ChildItem $dir -Filter *.vba -File
+          foreach ($f in $files) {
+            $code = [System.IO.File]::ReadAllText($f.FullName, $enc)
+            $m = [System.Text.RegularExpressions.Regex]::Match($code, $pattern, $options)
+            if ($m.Success) {
+              Write-Host ("OK   {0} -> {1}" -f $f.Name, $m.Groups[1].Value)
+            } else {
+              Write-Host ("FAIL {0}" -f $f.Name)
+              $failed += $f.Name
+            }
+          }
+
+          Write-Host "共 $($files.Count) 个脚本，失败 $($failed.Count) 个"
+          if ($failed.Count -gt 0) {
+            Write-Error ("以下脚本无法识别出 Sub/Function 过程名: " + ($failed -join ', '))
+            exit 1
+          }
+
       - name: 列出产物
         if: always()
         shell: pwsh
