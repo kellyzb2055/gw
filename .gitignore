@@ -1,0 +1,13 @@
+# 构建输出
+[Bb]in/
+[Oo]bj/
+packages/
+
+# 签名私钥，务必不要提交
+*.pfx
+*.snk
+
+# 用户级配置
+*.csproj.user
+*.suo
+.vs/

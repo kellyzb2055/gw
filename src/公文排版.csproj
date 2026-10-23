@@ -526,7 +526,7 @@
     <SignAssembly Condition="Exists('$(_GwSignKey)')">true</SignAssembly>
     <AssemblyOriginatorKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</AssemblyOriginatorKeyFile>
     <ManifestKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</ManifestKeyFile>
-    <ManifestCertificateThumbprint Condition="Exists('$(_GwSignKey)')">3E0F68E17300583E21B4917F6B132C55668740B8</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint Condition="Exists('$(_GwSignKey)')">6F5E89EB98A164A7A28E8A08C9D005727987B689</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
     <DelaySign>false</DelaySign>
