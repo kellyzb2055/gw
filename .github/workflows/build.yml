@@ -99,6 +99,44 @@ jobs:
             exit 1
           }
 
+      - name: 打包安装脚本
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:GITHUB_WORKSPACE 'install'
+          $dst = Join-Path $env:GITHUB_WORKSPACE 'src\bin\Release'
+          if (-not (Test-Path $src)) { throw '未找到 install 目录' }
+
+          # .ps1 统一转成 UTF-8 带 BOM，保证 Windows PowerShell 5.1 能正确读取中文键名
+          $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+          foreach ($f in Get-ChildItem $src -File) {
+            $target = Join-Path $dst $f.Name
+            if ($f.Extension -eq '.ps1') {
+              [System.IO.File]::WriteAllText($target, [System.IO.File]::ReadAllText($f.FullName), $utf8Bom)
+            } else {
+              Copy-Item $f.FullName $target -Force
+            }
+            Write-Host "已打包: $($f.Name)"
+          }
+
+      - name: 校验安装脚本语法
+        shell: pwsh
+        run: |
+          $dst = Join-Path $env:GITHUB_WORKSPACE 'src\bin\Release'
+          $scripts = Get-ChildItem $dst -Filter *.ps1 -ErrorAction SilentlyContinue
+          if (-not $scripts) { throw '产物目录中没有安装脚本' }
+
+          foreach ($f in $scripts) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors -and $errors.Count -gt 0) {
+              Write-Error "$($f.Name) 语法错误: $($errors[0].Message)（第 $($errors[0].Extent.StartLineNumber) 行）"
+              exit 1
+            }
+            $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+            $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+            Write-Host "OK $($f.Name) （BOM: $hasBom）"
+          }
+
       - name: 列出产物
         if: always()
         shell: pwsh
@@ -106,6 +144,11 @@ jobs:
           Write-Host "=== bin\Release ==="
           Get-ChildItem 'src\bin\Release' -Recurse -File -ErrorAction SilentlyContinue |
             Select-Object FullName, Length | Format-Table -AutoSize
+
+          Write-Host "=== 安装脚本 ==="
+          Get-ChildItem 'src\bin\Release' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.ps1', '.bat' } |
+            Select-Object Name, Length | Format-Table -AutoSize
 
           Write-Host "=== .vsto 部署信息 ==="
           $vsto = Get-ChildItem 'src\bin\Release\*.vsto' -ErrorAction SilentlyContinue | Select-Object -First 1
