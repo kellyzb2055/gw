@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Office.Tools.Ribbon;
-using Microsoft.Vbe.Interop;
 using MSWord = Microsoft.Office.Interop.Word;
 using MSOffice = Microsoft.Office.Core;
 
@@ -14,6 +14,13 @@ namespace 公文排版
 {
     public partial class Ribbon1
     {
+        // VBIDE 枚举 vbext_ComponentType 的取值，改用 late binding 后不再引用 Microsoft.Vbe.Interop
+        private const int VbextCtStdModule = 1;
+        private const int VbextCtClassModule = 2;
+        private const int VbextCtMsForm = 3;
+        private const int VbextCtActiveXDesigner = 11;
+        private const int VbextCtDocument = 100;
+
         private void OpenVba()
         {
             try
@@ -28,16 +35,15 @@ namespace 公文排版
 
                 if (!CheckVbaEncoding(vbaFile)) return;
 
-                MSWord.Document doc = WordApp.ActiveDocument;
-                VBComponents vbc = doc.VBProject.VBComponents;
-                VBComponent vbm = vbc.Add(vbext_ComponentType.vbext_ct_StdModule);
+                dynamic doc = WordApp.ActiveDocument;
+                dynamic vbc = doc.VBProject.VBComponents;
+                dynamic vbm = vbc.Add(VbextCtStdModule);
                 vbm.Name = "小恐龙公文排版助手";
-                CodeModule module = vbm.CodeModule;
+                dynamic module = vbm.CodeModule;
                 module.AddFromFile(vbaFile);
-
-                vbext_ProcKind ProcKind;
-                int startLine = module.CountOfDeclarationLines + 1;
-                string macroName = module.get_ProcOfLine(startLine, out ProcKind);
+                string macroName = GetFirstProcName(module);
+                if (string.IsNullOrEmpty(macroName))
+                    throw new InvalidOperationException("未能从VBA文件中识别出 Sub/Function 过程名。");
 
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
@@ -72,16 +78,18 @@ namespace 公文排版
             {
                 if (!CheckVbaEncoding(vbaFile)) return false;
 
-                MSWord.Document doc = WordApp.ActiveDocument;
-                VBComponents vbc = doc.VBProject.VBComponents;
-                VBComponent vbm = vbc.Add(vbext_ComponentType.vbext_ct_StdModule);
+                dynamic doc = WordApp.ActiveDocument;
+                dynamic vbc = doc.VBProject.VBComponents;
+                dynamic vbm = vbc.Add(VbextCtStdModule);
                 vbm.Name = "小恐龙公文排版助手";
-                CodeModule module = vbm.CodeModule;
+                dynamic module = vbm.CodeModule;
                 module.AddFromFile(vbaFile);
-
-                vbext_ProcKind ProcKind;
-                int startLine = module.CountOfDeclarationLines + 1;
-                string macroName = module.get_ProcOfLine(startLine, out ProcKind);
+                string macroName = GetFirstProcName(module);
+                if (string.IsNullOrEmpty(macroName))
+                {
+                    WordApp.StatusBar = "未能从VBA文件中识别出 Sub/Function 过程名。";
+                    return false;
+                }
 
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
@@ -103,6 +111,22 @@ namespace 公文排版
         private void BtnVBAlist_Click(object sender, RibbonControlEventArgs e)
         {
             if (sender is RibbonButton btn) RunVBA(btn.ScreenTip);
+        }
+
+        /// <summary>
+        /// 取模块中第一个过程名；替代 VBIDE 的 get_ProcOfLine，避免编译期依赖 Microsoft.Vbe.Interop。
+        /// </summary>
+        private static string GetFirstProcName(dynamic module)
+        {
+            int count = (int)module.CountOfLines;
+            if (count <= 0) return string.Empty;
+
+            string code = (string)module.get_Lines(1, count);
+            Match match = Regex.Match(
+                code,
+                @"^[ \t]*(?:Public[ \t]+|Private[ \t]+|Friend[ \t]+)?(?:Static[ \t]+)?(?:Sub|Function)[ \t]+([^\s(]+)",
+                RegexOptions.Multiline | RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : string.Empty;
         }
 
         private bool CheckVbaEncoding(string vbaFile)
@@ -227,24 +251,25 @@ namespace 公文排版
         {
             try
             {
-                MSWord.Document doc = WordApp.ActiveDocument;
-                VBComponents vbcs = doc.VBProject.VBComponents;
+                dynamic doc = WordApp.ActiveDocument;
+                dynamic vbcs = doc.VBProject.VBComponents;
                 var names = new StringBuilder();
 
-                for (int i = vbcs.Count; i >= 1; i--)
+                for (int i = (int)vbcs.Count; i >= 1; i--)
                 {
-                    VBComponent vbc = vbcs.Item(i);
-                    names.AppendLine(vbc.Name);
-                    switch (vbc.Type)
+                    dynamic vbc = vbcs.Item(i);
+                    names.AppendLine((string)vbc.Name);
+                    switch ((int)vbc.Type)
                     {
-                        case vbext_ComponentType.vbext_ct_StdModule:
-                        case vbext_ComponentType.vbext_ct_ClassModule:
-                        case vbext_ComponentType.vbext_ct_MSForm:
+                        case VbextCtStdModule:
+                        case VbextCtClassModule:
+                        case VbextCtMsForm:
                             vbcs.Remove(vbc);
                             break;
-                        case vbext_ComponentType.vbext_ct_ActiveXDesigner:
-                        case vbext_ComponentType.vbext_ct_Document:
-                            vbc.CodeModule.DeleteLines(1, vbc.CodeModule.CountOfLines);
+                        case VbextCtActiveXDesigner:
+                        case VbextCtDocument:
+                            dynamic code = vbc.CodeModule;
+                            code.DeleteLines(1, (int)code.CountOfLines);
                             break;
                     }
                 }
