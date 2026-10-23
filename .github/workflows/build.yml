@@ -52,8 +52,15 @@ jobs:
       - name: 配置 MSBuild
         uses: microsoft/setup-msbuild@v2
 
+      - name: 创建临时签名证书
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=gw-ci-build" -KeyExportPolicy Exportable -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
+          Write-Host "生成证书: $($cert.Thumbprint)"
+          "CERT_THUMB=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: 编译 Release
-        run: msbuild src\公文排版.csproj /p:Configuration=Release /p:Platform=AnyCPU /v:normal /nologo
+        run: msbuild src\公文排版.csproj /p:Configuration=Release /p:Platform=AnyCPU /p:SignManifests=true /p:ManifestCertificateThumbprint=${{ env.CERT_THUMB }} /v:normal /nologo
 
       - name: 列出产物
         if: always()
