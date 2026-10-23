@@ -522,8 +522,9 @@
     <_GwSignKey>$(MSBuildProjectDirectory)\xkonglong.com.pfx</_GwSignKey>
     <SignManifests Condition="!Exists('$(_GwSignKey)')">false</SignManifests>
     <SignManifests Condition="Exists('$(_GwSignKey)')">true</SignManifests>
-    <SignAssembly Condition="!Exists('$(_GwSignKey)')">false</SignAssembly>
-    <SignAssembly Condition="Exists('$(_GwSignKey)')">true</SignAssembly>
+    <!-- 强名称签名默认关闭：VSTO 加载项不要求，且无交互环境无法导入密钥容器；需要时用 /p:GwStrongName=true 开启 -->
+    <SignAssembly>false</SignAssembly>
+    <SignAssembly Condition="'$(GwStrongName)' == 'true'">true</SignAssembly>
     <AssemblyOriginatorKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</AssemblyOriginatorKeyFile>
     <ManifestKeyFile Condition="Exists('$(_GwSignKey)')">xkonglong.com.pfx</ManifestKeyFile>
     <ManifestCertificateThumbprint Condition="Exists('$(_GwSignKey)')">6F5E89EB98A164A7A28E8A08C9D005727987B689</ManifestCertificateThumbprint>
