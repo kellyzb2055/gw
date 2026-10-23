@@ -98,3 +98,20 @@ jobs:
           Write-Host "=== bin\Release ==="
           Get-ChildItem 'src\bin\Release' -Recurse -File -ErrorAction SilentlyContinue |
             Select-Object FullName, Length | Format-Table -AutoSize
+
+          Write-Host "=== .vsto 部署信息 ==="
+          $vsto = Get-ChildItem 'src\bin\Release\*.vsto' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($vsto) {
+            $raw = Get-Content $vsto.FullName -Raw
+            if ($raw -match 'codebase="([^"]*)"') { Write-Host "deploymentProvider: $($matches[1])" } else { Write-Host 'deploymentProvider: 未找到' }
+            if ($raw -match 'publisherIdentity name="([^"]*)"') { Write-Host "publisher: $($matches[1])" } else { Write-Host 'publisherIdentity: 未找到' }
+            if ($raw -match '<Signature') { Write-Host '清单签名: 有' } else { Write-Host '清单签名: 无' }
+          }
+
+      - name: 上传构建产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gw-build-${{ github.run_number }}
+          path: src/bin/Release/**
+          if-no-files-found: warn
